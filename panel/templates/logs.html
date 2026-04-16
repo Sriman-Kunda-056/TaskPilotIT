@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Logs{% endblock %}
+{% block page_title %}/ logs{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h1>Activity Logs</h1><div class="sub">All panel + agent actions</div></div>
+  <a href="/logs" class="btn btn-ghost btn-sm" onclick="location.reload();return false;">↻ Refresh</a>
+</div>
+
+<div class="filter-tabs">
+  <a href="/logs?source=all"   class="filter-tab {% if source=='all'   %}active{% endif %}">All</a>
+  <a href="/logs?source=panel" class="filter-tab {% if source=='panel' %}active{% endif %}">Panel</a>
+  <a href="/logs?source=agent" class="filter-tab {% if source=='agent' %}active{% endif %}">Agent</a>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Time</th><th>Source</th><th>Event</th><th>Status</th><th>Detail</th></tr>
+      </thead>
+      <tbody id="log-tbody">
+        {% for l in logs %}
+        <tr>
+          <td class="cell-dim" style="font-family:var(--mono);font-size:.7rem">{{ l.id }}</td>
+          <td class="cell-dim" style="font-family:var(--mono);white-space:nowrap">{{ l.created_at[11:19] }}</td>
+          <td>
+            <span class="badge {{ 'badge-pro' if l.source == 'agent' else 'badge-basic' }}">
+              {{ l.source }}
+            </span>
+          </td>
+          <td class="cell-mono">{{ l.event }}</td>
+          <td>
+            <span class="badge {{ 'badge-active' if l.success else 'badge-disabled' }}">
+              {{ '✓ ok' if l.success else '✗ err' }}
+            </span>
+          </td>
+          <td class="cell-dim" style="font-size:.78rem;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ l.detail or '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not logs %}
+        <tr><td colspan="6" style="text-align:center;color:var(--text3);padding:2rem;font-size:.83rem">No logs yet.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Live log appender via WebSocket -->
+<div class="card" style="margin-top:.5rem">
+  <div class="card-head">
+    <h2>Live Stream</h2>
+    <span id="live-count" style="font-family:var(--mono);font-size:.7rem;color:var(--text3)">0 new</span>
+  </div>
+  <div id="live-feed" style="padding:.75rem 1.25rem;display:flex;flex-direction:column;gap:.3rem;max-height:180px;overflow-y:auto;font-family:var(--mono);font-size:.72rem;"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let liveCount = 0;
+const feed = document.getElementById('live-feed');
+const countEl = document.getElementById('live-count');
+
+window._socket.on('action_result', (d) => {
+  liveCount++;
+  countEl.textContent = liveCount + ' new';
+  const el = document.createElement('div');
+  el.style.cssText = `color:${d.success ? 'var(--green)' : 'var(--red)'};padding:.15rem 0;border-bottom:1px solid var(--border);`;
+  el.textContent = `[${new Date().toLocaleTimeString('en-US',{hour12:false})}] panel :: ${d.event} → ${JSON.stringify(d.data || d.error || '')}`;
+  feed.prepend(el);
+});
+
+window._socket.on('agent_step', (d) => {
+  liveCount++;
+  countEl.textContent = liveCount + ' new';
+  const el = document.createElement('div');
+  el.style.cssText = 'color:var(--cyan);padding:.15rem 0;border-bottom:1px solid var(--border);';
+  el.textContent = `[${new Date().toLocaleTimeString('en-US',{hour12:false})}] agent :: step ${d.step_num} — ${d.description}`;
+  feed.prepend(el);
+});
+</script>
+{% endblock %}

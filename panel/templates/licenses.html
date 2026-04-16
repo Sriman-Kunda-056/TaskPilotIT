@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Licenses{% endblock %}
+{% block page_title %}/ licenses{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h1>License Management</h1><div class="sub">{{ assigned|length }} licenses assigned</div></div>
+</div>
+
+<div class="card" style="max-width:540px">
+  <div class="card-head"><h2>Assign License</h2></div>
+  <div class="card-body">
+    <form action="/licenses/assign" method="POST" id="assign-license-section">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="field">
+          <label>User Email</label>
+          <input type="email" name="email" id="license-email" placeholder="user@company.com" required/>
+        </div>
+        <div class="field">
+          <label>License Type</label>
+          <select name="license_type" id="license_type">
+            <option value="basic">Basic</option>
+            <option value="pro">Pro</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </div>
+        <div class="field" style="display:flex;align-items:flex-end">
+          <button type="submit" class="btn" name="submit-assign-license" style="width:100%">Assign</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Assigned Licenses</h2></div>
+  {% if assigned %}
+  <div class="table-wrap">
+    <table id="licenses-table">
+      <thead>
+        <tr><th>User</th><th>Email</th><th>License</th><th>Assigned</th></tr>
+      </thead>
+      <tbody>
+        {% for l in assigned %}
+        <tr>
+          <td class="cell-mono">{{ l.name }}</td>
+          <td class="cell-dim">{{ l.email }}</td>
+          <td><span class="badge badge-{{ l.license_type }}">{{ l.license_type }}</span></td>
+          <td class="cell-dim">{{ l.assigned_at[:10] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body" style="color:var(--text3);font-size:.83rem;">No licenses assigned yet.</div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}/ dashboard{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>System Overview</h1>
+    <div class="sub">Real-time status across all managed resources</div>
+  </div>
+  <a href="/agent" class="btn">◎ Run AI Agent</a>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <span class="stat-num">{{ total }}</span>
+    <span class="stat-label">Total Users</span>
+  </div>
+  <div class="stat-card green">
+    <span class="stat-num">{{ active }}</span>
+    <span class="stat-label">Active</span>
+  </div>
+  <div class="stat-card amber">
+    <span class="stat-num">{{ total - active }}</span>
+    <span class="stat-label">Disabled</span>
+  </div>
+  <div class="stat-card purple">
+    <span class="stat-num">{{ log_cnt }}</span>
+    <span class="stat-label">Log Entries</span>
+  </div>
+</div>
+
+<div class="two-col">
+  <!-- Recent users -->
+  <div class="card">
+    <div class="card-head">
+      <h2>Recent Users</h2>
+      <a href="/users" class="btn btn-ghost btn-sm">View All</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for u in recent %}
+          <tr>
+            <td class="cell-mono">{{ u.name }}</td>
+            <td class="cell-dim">{{ u.email }}</td>
+            <td class="cell-dim">{{ u.role }}</td>
+            <td>
+              <span class="badge badge-dot {{ 'badge-active' if u.active else 'badge-disabled' }}">
+                {{ 'Active' if u.active else 'Off' }}
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent agent runs -->
+  <div class="card">
+    <div class="card-head">
+      <h2>Recent Agent Runs</h2>
+      <a href="/agent" class="btn btn-ghost btn-sm">Open Agent</a>
+    </div>
+    {% if runs %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Task</th><th>Status</th><th>Steps</th><th>Time</th></tr></thead>
+        <tbody>
+          {% for r in runs %}
+          <tr class="run-row">
+            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                class="cell-mono" title="{{ r.task }}">{{ r.task[:40] }}…</td>
+            <td><span class="badge badge-{{ r.status }}">{{ r.status }}</span></td>
+            <td class="cell-dim">{{ r.steps }}</td>
+            <td class="cell-dim">{{ r.created_at[11:16] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body" style="color:var(--text3);font-size:.83rem;">
+      No agent runs yet. <a href="/agent" style="color:var(--cyan)">Start one →</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  panel:
+    build: .
+    command: python panel/app.py
+    ports:
+      - "5000:5000"
+    volumes:
+      - db-data:/app/panel
+    environment:
+      - FLASK_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  agent:
+    build: .
+    command: python main.py --headless
+    depends_on:
+      panel:
+        condition: service_healthy
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - PANEL_URL=http://panel:5000
+    profiles: [agent]
+
+  slack:
+    build: .
+    command: python slack_bot.py
+    depends_on:
+      panel:
+        condition: service_healthy
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN}
+      - PANEL_URL=http://panel:5000
+    profiles: [slack]
+
+volumes:
+  db-data:

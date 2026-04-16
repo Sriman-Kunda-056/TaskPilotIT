@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>{% block title %}IT Ops{% endblock %} · Decawork</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+</head>
+<body>
+
+  <!-- Sidebar nav -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">⬡</span>
+      <span class="logo-text">IT<strong>Ops</strong></span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">
+        <span class="nav-icon">◈</span><span>Dashboard</span>
+      </a>
+      <a href="/users" class="nav-item {% if '/users' in request.path %}active{% endif %}">
+        <span class="nav-icon">◉</span><span>Users</span>
+      </a>
+      <a href="/licenses" class="nav-item {% if '/licenses' in request.path %}active{% endif %}">
+        <span class="nav-icon">◇</span><span>Licenses</span>
+      </a>
+      <a href="/logs" class="nav-item {% if '/logs' in request.path %}active{% endif %}">
+        <span class="nav-icon">◫</span><span>Logs</span>
+      </a>
+      <a href="/agent" class="nav-item {% if '/agent' in request.path %}active{% endif %}">
+        <span class="nav-icon">◎</span><span>AI Agent</span>
+        <span class="nav-badge" id="agent-badge" style="display:none">●</span>
+      </a>
+    </nav>
+
+    <!-- Live event ticker at bottom of sidebar -->
+    <div class="sidebar-ticker">
+      <div class="ticker-label">LIVE EVENTS</div>
+      <div id="ticker-feed"></div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <div class="main-wrap">
+    <header class="topbar">
+      <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+      <div class="topbar-right">
+        <div class="ws-dot" id="ws-dot" title="WebSocket"></div>
+        <span class="topbar-time" id="clock"></span>
+      </div>
+    </header>
+
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script>
+    // Clock
+    const clockEl = document.getElementById('clock');
+    function tick() {
+      clockEl.textContent = new Date().toLocaleTimeString('en-US', {hour12:false});
+    }
+    tick(); setInterval(tick, 1000);
+
+    // WebSocket
+    const socket = io();
+    const dot = document.getElementById('ws-dot');
+    const ticker = document.getElementById('ticker-feed');
+    const badge = document.getElementById('agent-badge');
+
+    socket.on('connect', () => { dot.classList.add('connected'); });
+    socket.on('disconnect', () => { dot.classList.remove('connected'); });
+
+    socket.on('action_result', (d) => {
+      addTick(d.event, d.success);
+    });
+
+    socket.on('agent_status', (d) => {
+      if (d.status === 'running') {
+        badge.style.display = 'inline';
+        badge.classList.add('pulse');
+      } else {
+        badge.style.display = 'none';
+        badge.classList.remove('pulse');
+      }
+      addTick('agent:' + d.status, d.status !== 'error');
+    });
+
+    function addTick(label, ok) {
+      const el = document.createElement('div');
+      el.className = 'tick-item ' + (ok ? 'tick-ok' : 'tick-err');
+      el.textContent = label;
+      ticker.prepend(el);
+      while (ticker.children.length > 5) ticker.removeChild(ticker.lastChild);
+    }
+
+    // Page-level socket reference for child pages
+    window._socket = socket;
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

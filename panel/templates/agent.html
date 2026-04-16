@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}AI Agent{% endblock %}
+{% block page_title %}/ ai agent{% endblock %}
+
+{% block content %}
+<div class="page-head" style="margin-bottom:1rem">
+  <div>
+    <h1>AI Agent Console</h1>
+    <div class="sub">Type a natural-language IT request — watch the agent execute it</div>
+  </div>
+  <div style="display:flex;gap:.5rem;align-items:center">
+    <div id="agent-status-pill" class="badge badge-basic">● Idle</div>
+  </div>
+</div>
+
+<div class="agent-layout">
+
+  <!-- Left: Chat messages -->
+  <div class="card agent-chat" style="display:flex;flex-direction:column;overflow:hidden">
+    <div class="card-head"><h2>Conversation + Steps</h2></div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="msg msg-system">
+        <div class="msg-icon">⬡</div>
+        <div>
+          <div class="msg-body">
+            Agent ready. Submit a task below — e.g.<br>
+            <em style="color:var(--cyan)">"reset password for alice@company.com"</em><br>
+            <em style="color:var(--cyan)">"check if john@company.com exists, if not create them and assign pro license"</em>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Input pinned at bottom -->
+    <div class="agent-input-area" id="agent-input-area">
+      <textarea class="agent-textarea" id="task-input" rows="1"
+        placeholder="Describe the IT task…"></textarea>
+      <button class="btn" id="run-btn" onclick="submitTask()">▶ Run</button>
+    </div>
+  </div>
+
+  <!-- Right: Live screenshot viewer -->
+  <div class="card agent-screen" style="display:flex;flex-direction:column;overflow:hidden">
+    <div class="card-head">
+      <h2>Browser View</h2>
+      <span id="step-counter" style="font-family:var(--mono);font-size:.7rem;color:var(--text3)">Step 0</span>
+    </div>
+    <div class="screen-viewer" id="screen-viewer" style="flex:1;border-radius:0 0 var(--radius) var(--radius)">
+      <div class="screen-placeholder">
+        <span class="icon">◎</span>
+        Waiting for agent to start…<br>
+        <span style="font-size:.65rem;margin-top:.3rem;display:block;color:var(--text3)">
+          Screenshots stream here as the agent navigates
+        </span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Past runs -->
+{% if runs %}
+<div class="card" style="margin-top:1rem">
+  <div class="card-head"><h2>Past Runs</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Task</th><th>Status</th><th>Steps</th><th>Time</th></tr></thead>
+      <tbody>
+        {% for r in runs %}
+        <tr>
+          <td class="cell-dim" style="font-family:var(--mono)">{{ r.id }}</td>
+          <td class="cell-mono" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+              title="{{ r.task }}">{{ r.task }}</td>
+          <td><span class="badge badge-{{ r.status }}">{{ r.status }}</span></td>
+          <td class="cell-dim">{{ r.steps }}</td>
+          <td class="cell-dim">{{ r.created_at[11:16] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chat     = document.getElementById('chat-messages');
+const viewer   = document.getElementById('screen-viewer');
+const pill     = document.getElementById('agent-status-pill');
+const counter  = document.getElementById('step-counter');
+const textarea = document.getElementById('task-input');
+const runBtn   = document.getElementById('run-btn');
+let stepNum    = 0;
+let currentRunId = null;
+let agentRunning = false;
+
+// Auto-grow textarea
+textarea.addEventListener('input', () => {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+});
+
+// Ctrl+Enter to submit
+textarea.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitTask();
+});
+
+function submitTask() {
+  const task = textarea.value.trim();
+  if (!task || agentRunning) return;
+
+  addMsg('user', task);
+  textarea.value = '';
+  textarea.style.height = 'auto';
+  setStatus('running');
+
+  fetch('/api/agent/run', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({task})
+  })
+  .then(async (r) => {
+    const ctype = (r.headers.get('content-type') || '').toLowerCase();
+    if (!ctype.includes('application/json')) {
+      const txt = await r.text();
+      throw new Error(`Server returned non-JSON response (HTTP ${r.status}). ${txt.slice(0, 120)}`);
+    }
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    return d;
+  })
+  .then(d => {
+    currentRunId = d.run_id;
+    addMsg('system', `Run #${d.run_id} started — watching browser…`);
+    stepNum = 0;
+    counter.textContent = 'Step 0';
+  })
+  .catch(e => {
+    addMsg('error', 'Failed to start agent: ' + e.message);
+    setStatus('idle');
+  });
+}
+
+// ── WebSocket listeners ────────────────────────────────────────────────────
+
+window._socket.on('agent_status', (d) => {
+  if (d.status === 'running') {
+    setStatus('running');
+  } else if (d.status === 'completed') {
+    setStatus('idle');
+    addMsg('agent', '✓ Task completed.\n' + (d.result || ''));
+    addMsg('system', 'Agent finished. You can submit a new task.');
+  } else if (d.status === 'error') {
+    setStatus('error');
+    addMsg('error', '✗ Error: ' + (d.error || 'Unknown error'));
+  }
+});
+
+window._socket.on('agent_step', (d) => {
+  stepNum = d.step_num || stepNum + 1;
+  counter.textContent = 'Step ' + stepNum;
+  addStep(d.description || d.action, stepNum, d.status || 'running');
+});
+
+window._socket.on('agent_screenshot', (d) => {
+  // d.image = base64 PNG
+  const src = 'data:image/png;base64,' + d.image;
+  viewer.innerHTML = `
+    <div class="screen-label">LIVE BROWSER</div>
+    <img src="${src}" alt="Agent screenshot"/>
+    <div class="screen-step-badge">Step ${stepNum}</div>
+  `;
+});
+
+window._socket.on('action_result', (d) => {
+  const icon = d.success ? '✓' : '✗';
+  const color = d.success ? 'var(--green)' : 'var(--red)';
+  addMsg('agent', `${icon} ${d.event}: ${JSON.stringify(d.data || d.error || '')}`);
+});
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function addMsg(type, text) {
+  const icons = {user:'U', agent:'A', system:'⬡', error:'!'};
+  const div = document.createElement('div');
+  div.className = `msg msg-${type}`;
+  div.innerHTML = `
+    <div class="msg-icon">${icons[type] || '·'}</div>
+    <div>
+      <div class="msg-body">${escHtml(text).replace(/\n/g,'<br>')}</div>
+      <div class="msg-time">${new Date().toLocaleTimeString('en-US',{hour12:false})}</div>
+    </div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addStep(desc, num, status) {
+  const div = document.createElement('div');
+  div.className = 'step-badge' + (status === 'done' ? ' step-done' : status === 'error' ? ' step-err' : '');
+  div.innerHTML = `<span style="color:var(--cyan)">Step ${num}</span> — ${escHtml(desc)}`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function setStatus(state) {
+  agentRunning = state === 'running';
+  runBtn.disabled = agentRunning;
+  runBtn.textContent = agentRunning ? '⏳ Running…' : '▶ Run';
+  const map = {
+    idle:      {cls:'badge-basic',   txt:'● Idle'},
+    running:   {cls:'badge-running', txt:'◎ Running'},
+    completed: {cls:'badge-completed',txt:'✓ Done'},
+    error:     {cls:'badge-error',   txt:'✗ Error'},
+  };
+  const s = map[state] || map.idle;
+  pill.className = 'badge ' + s.cls;
+  pill.textContent = s.txt;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// Quick-fill buttons
+const presets = [
+  "Reset password for alice@company.com",
+  "Create user John Doe john@company.com role employee",
+  "Check if newuser@company.com exists, if not create them then assign pro license",
+  "Disable bob@company.com",
+  "Assign enterprise license to alice@company.com",
+];
+
+// Insert preset buttons above the input
+const presetRow = document.createElement('div');
+presetRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:.4rem;padding:.5rem 1.25rem;border-top:1px solid var(--border);';
+presetRow.innerHTML = '<span style="font-size:.68rem;color:var(--text3);font-family:var(--mono);align-self:center">Quick:</span>';
+presets.forEach(p => {
+  const b = document.createElement('button');
+  b.className = 'btn btn-ghost btn-sm';
+  b.textContent = p.split(' ').slice(0,3).join(' ') + '…';
+  b.title = p;
+  b.onclick = () => { textarea.value = p; textarea.focus(); };
+  presetRow.appendChild(b);
+});
+document.getElementById('agent-input-area').before(presetRow);
+</script>
+{% endblock %}

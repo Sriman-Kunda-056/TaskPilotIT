@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.py[cod]
+venv/
+env/
+panel/admin.db
+*.db
+.browser_use/
+.DS_Store
+*.log

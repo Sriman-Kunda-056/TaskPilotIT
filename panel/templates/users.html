@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block page_title %}/ users{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div><h1>User Management</h1><div class="sub">{{ users|length }} users in directory</div></div>
+</div>
+
+<div class="two-col">
+  <!-- Create User -->
+  <div class="card">
+    <div class="card-head"><h2>Create User</h2></div>
+    <div class="card-body">
+      <form action="/users/create" method="POST">
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="field">
+            <label>Full Name</label>
+            <input type="text" name="name" placeholder="Jane Doe" required/>
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input type="email" name="email" placeholder="jane@company.com" required/>
+          </div>
+          <div class="field">
+            <label>Role</label>
+            <select name="role">
+              <option value="employee">Employee</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+            </select>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end">
+            <button type="submit" class="btn" name="submit-create-user" style="width:100%">+ Create</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div style="display:flex;flex-direction:column;gap:1rem">
+    <div class="card">
+      <div class="card-head"><h2>Reset Password</h2></div>
+      <div class="card-body">
+        <form action="/users/reset-password" method="POST">
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div class="field">
+              <label>User Email</label>
+              <input type="email" name="email" placeholder="user@company.com" required/>
+            </div>
+            <div class="field">
+              <label>New Password</label>
+              <div style="display:flex;gap:.4rem">
+                <input type="password" name="new_password" id="reset-pw"
+                       placeholder="Blank = auto-generate"
+                       autocomplete="new-password" style="flex:1"/>
+                <button type="button" title="Toggle visibility"
+                        onclick="var f=document.getElementById('reset-pw');
+                                 f.type=f.type==='password'?'text':'password';
+                                 this.textContent=f.type==='password'?'👁':'🙈';"
+                        style="background:#21262d;border:1px solid #3b3b52;border-radius:6px;
+                               padding:0 .6rem;cursor:pointer;font-size:.9rem">👁</button>
+              </div>
+              <span style="font-size:.75rem;color:#8b949e">Leave blank to auto-generate a secure password</span>
+            </div>
+            <div class="field" style="display:flex;align-items:flex-end;grid-column:1/-1">
+              <button type="submit" class="btn btn-warn" name="submit-reset-password" style="width:100%">Reset Password</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Toggle Status</h2></div>
+      <div class="card-body">
+        <form action="/users/toggle" method="POST">
+          <div class="form-grid" style="grid-template-columns:1fr auto">
+            <div class="field">
+              <label>User Email</label>
+              <input type="email" name="email" placeholder="user@company.com" required/>
+            </div>
+            <div class="field" style="display:flex;align-items:flex-end">
+              <button type="submit" class="btn btn-ghost" name="submit-toggle-user">Toggle</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Users table -->
+<div class="card">
+  <div class="card-head"><h2>All Users</h2></div>
+  <div class="table-wrap">
+    <table id="users-table">
+      <thead>
+        <tr><th>Name</th><th>Email</th><th>Role</th><th>License</th><th>Status</th><th>Created</th></tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td class="cell-mono">{{ u.name }}</td>
+          <td class="cell-dim">{{ u.email }}</td>
+          <td class="cell-dim">{{ u.role }}</td>
+          <td>
+            {% if u.license_type %}
+            <span class="badge badge-{{ u.license_type }}">{{ u.license_type }}</span>
+            {% else %}<span class="cell-dim">—</span>{% endif %}
+          </td>
+          <td>
+            <span class="badge badge-dot {{ 'badge-active' if u.active else 'badge-disabled' }}">
+              {{ 'Active' if u.active else 'Disabled' }}
+            </span>
+          </td>
+          <td class="cell-dim">{{ u.created_at[:10] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Reset Password Result Toast -->
+<div id="pw-toast" style="display:none;position:fixed;top:1.5rem;right:1.5rem;z-index:9999;
+     background:#1e1e2e;border:1px solid #3b3b52;border-radius:10px;padding:1.25rem 1.5rem;
+     min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.45)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+    <span style="font-weight:600;color:#c9d1d9">🔑 Password Reset</span>
+    <button onclick="document.getElementById('pw-toast').style.display='none'"
+            style="background:none;border:none;color:#888;cursor:pointer;font-size:1.1rem">✕</button>
+  </div>
+  <div style="color:#8b949e;font-size:.8rem;margin-bottom:.25rem">Email</div>
+  <div id="toast-email" style="color:#c9d1d9;font-size:.9rem;margin-bottom:.75rem"></div>
+  <div style="color:#8b949e;font-size:.8rem;margin-bottom:.25rem">
+    New Password <span id="toast-generated" style="color:#56d364;font-size:.75rem"></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:.5rem">
+    <code id="toast-pw" style="background:#0d1117;padding:.35rem .7rem;border-radius:6px;
+          font-size:1rem;color:#79c0ff;letter-spacing:.05em;flex:1"></code>
+    <button onclick="copyPw(event)" title="Copy"
+            style="background:#21262d;border:1px solid #3b3b52;border-radius:6px;
+                   padding:.35rem .6rem;color:#c9d1d9;cursor:pointer;font-size:.85rem">📋</button>
+  </div>
+  <div style="color:#f0883e;font-size:.75rem;margin-top:.75rem">
+    ⚠ Share this securely — it won't be shown again.
+  </div>
+</div>
+
+<!-- Error Toast -->
+<div id="err-toast" style="display:none;position:fixed;top:1.5rem;right:1.5rem;z-index:9999;
+     background:#1e1e2e;border:1px solid #f85149;border-radius:10px;padding:1rem 1.5rem;
+     min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.45)">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span style="color:#f85149;font-weight:600">❌ <span id="err-msg"></span></span>
+    <button onclick="document.getElementById('err-toast').style.display='none'"
+            style="background:none;border:none;color:#888;cursor:pointer;margin-left:1rem">✕</button>
+  </div>
+</div>
+
+<script>
+  if (typeof io !== 'undefined') {
+    const socket = io();
+    socket.on('action_result', function(data) {
+      if (data.event === 'password_reset') {
+        if (data.success) {
+          document.getElementById('toast-email').textContent     = data.data.email;
+          document.getElementById('toast-pw').textContent        = data.data.new_password;
+          document.getElementById('toast-generated').textContent = data.data.generated ? '(auto-generated)' : '(custom)';
+          document.getElementById('pw-toast').style.display      = 'block';
+          setTimeout(() => document.getElementById('pw-toast').style.display = 'none', 30000);
+        } else {
+          document.getElementById('err-msg').textContent     = data.error || 'Reset failed';
+          document.getElementById('err-toast').style.display = 'block';
+          setTimeout(() => document.getElementById('err-toast').style.display = 'none', 5000);
+        }
+      }
+    });
+  }
+
+  function copyPw(e) {
+    navigator.clipboard.writeText(document.getElementById('toast-pw').textContent).then(() => {
+      e.target.textContent = '✅';
+      setTimeout(() => e.target.textContent = '📋', 2000);
+    });
+  }
+</script>
+{% endblock %}
