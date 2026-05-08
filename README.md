@@ -63,9 +63,16 @@ playwright install chromium
 | `GROQ_API_KEY` | [console.groq.com/keys](https://console.groq.com/keys) | Generous free tier |
 
 ```bash
-cp env.example .env
-# Paste both keys into .env
+cp .env.example .env
+# Paste required keys into .env
 ```
+
+Required:
+- `GROQ_API_KEY` (task planner)
+- `GEMINI_API_KEY` (browser agent)
+
+Optional:
+- `PANEL_URL` (defaults to `http://localhost:5000`; set to your public URL in deployments if needed)
 
 ### 3. Run
 
@@ -120,6 +127,8 @@ In Slack: `@YourBot reset password for alice@company.com`
 npm i -g @railway/cli
 railway login && railway init
 railway variables set GEMINI_API_KEY=... GROQ_API_KEY=...
+# Optional:
+# railway variables set PANEL_URL=https://<your-service>.up.railway.app
 railway up
 ```
 

@@ -35,7 +35,7 @@ async def run_browser_agent(
     step_counter = {"n": 0}
 
     # ── Screenshot helper ──────────────────────────────────────────────────
-    async def capture_and_emit(description: str, status: str = "running"):
+    async def capture_and_emit(description: str, status: str = "running", agent_instance=None):
         """Take a screenshot of the current browser page and broadcast it."""
         step_counter["n"] += 1
         step_num = step_counter["n"]
@@ -49,23 +49,26 @@ async def run_browser_agent(
                 "status":      status,
             })
 
-        # Take screenshot
+        # Take screenshot (best-effort, API-compatible across browser-use versions)
         try:
-            context = browser.browser_context
-            if context:
-                pages = context.pages if hasattr(context, "pages") else []
-                page  = pages[-1] if pages else None
-                if page is None and hasattr(context, "new_page"):
-                    page = await context.new_page()
-                if page:
-                    png_bytes = await page.screenshot(full_page=False)
-                    b64 = base64.b64encode(png_bytes).decode()
-                    if sock is not None:
-                        sock.emit("agent_screenshot", {
-                            "run_id":   run_id,
-                            "step_num": step_num,
-                            "image":    b64,
-                        })
+            context = getattr(agent_instance, "browser_context", None) or getattr(browser, "context", None)
+            page = None
+            if context is not None:
+                pages = getattr(context, "pages", None) or []
+                if pages:
+                    page = pages[-1]
+                elif hasattr(context, "get_current_page"):
+                    page = await context.get_current_page()
+
+            if page is not None:
+                png_bytes = await page.screenshot(full_page=False)
+                b64 = base64.b64encode(png_bytes).decode()
+                if sock is not None:
+                    sock.emit("agent_screenshot", {
+                        "run_id":   run_id,
+                        "step_num": step_num,
+                        "image":    b64,
+                    })
         except Exception as e:
             print(f"[Screenshot] Could not capture: {e}")
 
@@ -78,7 +81,7 @@ async def run_browser_agent(
     )
 
     # Emit start screenshot
-    await capture_and_emit("Starting agent — opening browser", "running")
+    await capture_and_emit("Starting agent — opening browser", "running", agent)
 
     # ── Custom run loop: intercept each step ───────────────────────────────
     # browser-use's Agent.run() returns an AgentHistoryList.
@@ -99,17 +102,35 @@ async def run_browser_agent(
                         last_action = str(acts[-1])[:120]
             except Exception:
                 last_action = "processing…"
-            await capture_and_emit(last_action or "agent step in progress")
+            await capture_and_emit(last_action or "agent step in progress", "running", agent)
             return result
 
         agent._step = hooked_step
 
     # Run the agent
-    history = await agent.run(max_steps=25)
+    try:
+        history = await agent.run(max_steps=25)
 
-    # Final screenshot
-    await capture_and_emit("Task complete", "done")
+        is_done = history.is_done() if hasattr(history, "is_done") else False
+        is_successful = history.is_successful() if hasattr(history, "is_successful") else None
+        result = history.final_result() if hasattr(history, "final_result") else str(history)
+        result_text = result if isinstance(result, str) else (str(result) if result is not None else "")
+        errors = history.errors() if hasattr(history, "errors") else []
+        last_error = next((err for err in reversed(errors) if err is not None), None)
 
-    result = history.final_result() if hasattr(history, "final_result") else str(history)
-    await browser.close()
-    return result or "Task completed"
+        if (not is_done) or (is_successful is not True) or not result_text.strip():
+            reason_parts = []
+            if not is_done:
+                reason_parts.append("agent did not reach done state")
+            if is_successful is not True:
+                reason_parts.append("agent did not report successful completion")
+            if not result_text.strip():
+                reason_parts.append("final result was empty")
+            fallback_reason = ", ".join(reason_parts) if reason_parts else "unknown failure condition"
+            raise RuntimeError(last_error or f"Browser agent failed: {fallback_reason}.")
+
+        # Final screenshot
+        await capture_and_emit("Task complete", "done", agent)
+        return result_text
+    finally:
+        await browser.close()

@@ -21,26 +21,30 @@ async def run_task(
     ws = PanelEventListener(PANEL_URL)
     ws.start()
 
-    # 2. Plan (Groq, free)
-    task_steps = plan_task(natural_language_request)
+    try:
+        # 2. Plan (Groq, free)
+        task_steps = plan_task(natural_language_request)
 
-    # 3. If we have a SocketIO instance, emit the plan as a step
-    if sock:
-        sock.emit("agent_step", {
-            "run_id": run_id,
-            "step_num": 0,
-            "description": f"Plan ready ({task_steps.count(chr(10))+1} steps) — launching browser",
-            "status": "running",
-        })
+        # 3. If we have a SocketIO instance, emit the plan as a step
+        if sock:
+            sock.emit("agent_step", {
+                "run_id": run_id,
+                "step_num": 0,
+                "description": f"Plan ready ({task_steps.count(chr(10))+1} steps) — launching browser",
+                "status": "running",
+            })
 
-    # 4. Run browser agent (Gemini Flash, free)
-    result = await run_browser_agent(
-        task=task_steps,
-        run_id=run_id,
-        sock=sock,
-        headless=headless,
-    )
-
-    ws.stop()
-    print(f"[Orchestrator] Done ✅  Result: {result[:120]}")
-    return result
+        # 4. Run browser agent (Gemini Flash, free)
+        result = await run_browser_agent(
+            task=task_steps,
+            run_id=run_id,
+            sock=sock,
+            headless=headless,
+        )
+        print(f"[Orchestrator] Done ✅  Result: {result[:120]}")
+        return result
+    except Exception as e:
+        print(f"[Orchestrator] Failed ❌  Error: {e}")
+        raise
+    finally:
+        ws.stop()
