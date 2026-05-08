@@ -263,13 +263,24 @@ def api_agent_run():
         try:
             result = asyncio.run(run_task(task, headless=True,
                                           run_id=run_id, sock=socketio))
-            if not result or not str(result).strip():
-                raise RuntimeError("Agent finished without a result.")
+            if result is None:
+                raise RuntimeError(
+                    "Agent completed execution but returned no result payload. "
+                    "Check the agent run logs for the underlying failure."
+                )
+
+            result_text = result if isinstance(result, str) else str(result)
+            if not result_text.strip():
+                raise RuntimeError(
+                    "Agent completed execution but returned an empty result. "
+                    "This usually means the task could not be completed successfully. "
+                    "Check the agent run logs for the underlying failure."
+                )
             c2 = get_db()
             c2.execute("""UPDATE agent_runs SET status='completed',result=?,
-                          finished_at=CURRENT_TIMESTAMP WHERE id=?""", (result[:500],run_id))
+                          finished_at=CURRENT_TIMESTAMP WHERE id=?""", (result_text[:500],run_id))
             c2.commit(); c2.close()
-            socketio.emit("agent_status", {"status":"completed","run_id":run_id,"result":result})
+            socketio.emit("agent_status", {"status":"completed","run_id":run_id,"result":result_text})
             log_event("agent","task_completed",True,f"run#{run_id}")
         except Exception as e:
             c2 = get_db()
