@@ -33,6 +33,7 @@ async def run_browser_agent(
     )
 
     step_counter = {"n": 0}
+    agent = None
 
     # ── Screenshot helper ──────────────────────────────────────────────────
     async def capture_and_emit(description: str, status: str = "running"):
@@ -49,23 +50,26 @@ async def run_browser_agent(
                 "status":      status,
             })
 
-        # Take screenshot
+        # Take screenshot (best-effort, API-compatible across browser-use versions)
         try:
-            context = browser.browser_context
-            if context:
-                pages = context.pages if hasattr(context, "pages") else []
-                page  = pages[-1] if pages else None
-                if page is None and hasattr(context, "new_page"):
-                    page = await context.new_page()
-                if page:
-                    png_bytes = await page.screenshot(full_page=False)
-                    b64 = base64.b64encode(png_bytes).decode()
-                    if sock is not None:
-                        sock.emit("agent_screenshot", {
-                            "run_id":   run_id,
-                            "step_num": step_num,
-                            "image":    b64,
-                        })
+            context = getattr(agent, "browser_context", None) or getattr(browser, "context", None)
+            page = None
+            if context is not None:
+                pages = getattr(context, "pages", None) or []
+                if pages:
+                    page = pages[-1]
+                elif hasattr(context, "get_current_page"):
+                    page = await context.get_current_page()
+
+            if page is not None:
+                png_bytes = await page.screenshot(full_page=False)
+                b64 = base64.b64encode(png_bytes).decode()
+                if sock is not None:
+                    sock.emit("agent_screenshot", {
+                        "run_id":   run_id,
+                        "step_num": step_num,
+                        "image":    b64,
+                    })
         except Exception as e:
             print(f"[Screenshot] Could not capture: {e}")
 
@@ -105,11 +109,20 @@ async def run_browser_agent(
         agent._step = hooked_step
 
     # Run the agent
-    history = await agent.run(max_steps=25)
+    try:
+        history = await agent.run(max_steps=25)
 
-    # Final screenshot
-    await capture_and_emit("Task complete", "done")
+        is_done = history.is_done() if hasattr(history, "is_done") else True
+        is_successful = history.is_successful() if hasattr(history, "is_successful") else None
+        result = history.final_result() if hasattr(history, "final_result") else str(history)
+        errors = history.errors() if hasattr(history, "errors") else []
+        last_error = next((err for err in reversed(errors) if err), None) if errors else None
 
-    result = history.final_result() if hasattr(history, "final_result") else str(history)
-    await browser.close()
-    return result or "Task completed"
+        if (not is_done) or (is_successful is False) or not result:
+            raise RuntimeError(last_error or "Browser agent did not complete the task successfully.")
+
+        # Final screenshot
+        await capture_and_emit("Task complete", "done")
+        return result
+    finally:
+        await browser.close()

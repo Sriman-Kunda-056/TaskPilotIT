@@ -263,6 +263,8 @@ def api_agent_run():
         try:
             result = asyncio.run(run_task(task, headless=True,
                                           run_id=run_id, sock=socketio))
+            if not result or not str(result).strip():
+                raise RuntimeError("Agent finished without a result.")
             c2 = get_db()
             c2.execute("""UPDATE agent_runs SET status='completed',result=?,
                           finished_at=CURRENT_TIMESTAMP WHERE id=?""", (result[:500],run_id))
@@ -274,6 +276,11 @@ def api_agent_run():
             c2.execute("""UPDATE agent_runs SET status='error',result=?,
                           finished_at=CURRENT_TIMESTAMP WHERE id=?""", (str(e),run_id))
             c2.commit(); c2.close()
+            socketio.emit("agent_step", {
+                "run_id": run_id,
+                "description": f"Run failed: {e}",
+                "status": "error",
+            })
             socketio.emit("agent_status", {"status":"error","run_id":run_id,"error":str(e)})
             log_event("agent","task_error",False,str(e))
 
