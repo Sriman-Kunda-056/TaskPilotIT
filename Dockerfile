@@ -18,4 +18,4 @@ RUN playwright install chromium && playwright install-deps chromium
 COPY . .
 
 EXPOSE 5000
-CMD ["python", "panel/app.py"]
+CMD ["sh", "-c", "gunicorn --worker-class eventlet -w 1 -b 0.0.0.0:${PORT:-5000} panel.app:app"]

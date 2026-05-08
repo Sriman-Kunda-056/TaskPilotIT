@@ -10,14 +10,14 @@ from dotenv import load_dotenv
 
 app = Flask(__name__)
 app.secret_key = "decawork-v2-secret"
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "admin.db")
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# Ensure API keys are available when launching the panel directly
+# Ensure API keys are available when launching panel directly
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 
@@ -85,6 +85,10 @@ def log_event(source, event, success, detail=""):
     c.commit(); c.close()
 
 
+# Ensure tables exist when app is imported by a production server (e.g., Gunicorn).
+init_db()
+
+
 # ── Pages ─────────────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -114,12 +118,14 @@ def users():
 
 @app.route("/users/create", methods=["POST"])
 def create_user():
-    name  = request.form.get("name","").strip()
-    email = request.form.get("email","").strip().lower()
-    role  = request.form.get("role","employee")
+    name     = request.form.get("name","").strip()
+    email    = request.form.get("email","").strip().lower()
+    role     = request.form.get("role","employee")
+    password = request.form.get("password","").strip() or "changeme123"
     c = get_db()
     try:
-        c.execute("INSERT INTO users(name,email,role) VALUES(?,?,?)", (name,email,role))
+        c.execute("INSERT INTO users(name,email,role,password) VALUES(?,?,?,?)",
+                  (name, email, role, password))
         c.commit()
         ev = {"event":"user_created","success":True,"data":{"name":name,"email":email,"role":role}}
         log_event("panel","user_created",True,f"{name} <{email}>")
@@ -326,7 +332,21 @@ def handle_step(data):
 
 
 if __name__ == "__main__":
-    init_db()
-    port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
-    socketio.run(app, host="0.0.0.0", port=port, debug=debug, allow_unsafe_werkzeug=True)
+    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
+    try:
+        bind_port = int(os.getenv("PORT", "5000"))
+    except ValueError:
+        bind_port = 5000
+
+    run_kwargs = {
+        "host": "0.0.0.0",
+        "port": bind_port,
+        "debug": debug_mode,
+        "use_reloader": False,
+    }
+
+    # Allow Werkzeug only when async libs are unavailable locally.
+    if socketio.async_mode == "threading":
+        run_kwargs["allow_unsafe_werkzeug"] = True
+
+    socketio.run(app, **run_kwargs)

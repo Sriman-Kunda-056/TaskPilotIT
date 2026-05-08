@@ -6,7 +6,8 @@ from agent.task_planner  import plan_task
 from agent.browser_agent import run_browser_agent
 from agent.ws_listener   import PanelEventListener
 
-PANEL_URL = os.getenv("PANEL_URL", "http://localhost:5000")
+_DEFAULT_PANEL_PORT = os.getenv("PORT", "5000")
+PANEL_URL = os.getenv("PANEL_URL", f"http://localhost:{_DEFAULT_PANEL_PORT}")
 
 
 async def run_task(

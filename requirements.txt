@@ -1,9 +1,26 @@
+# Web panel
 flask==3.0.3
 flask-socketio==5.3.6
 python-socketio[asyncio_client]==5.11.3
+
+# Browser agent
 browser-use==0.1.40
-langchain-google-genai>=2.0.11,<5
+playwright>=1.40.0
+
+# LLMs
+# Pin to a known-good combo to avoid:
+# GenerativeServiceAsyncClient.generate_content() got an unexpected keyword argument 'max_retries'
+langchain-google-genai==2.0.11
+google-generativeai==0.8.5
 groq>=1.1.2,<2
+
+# Utilities
 python-dotenv==1.0.1
 websocket-client>=1.8.0
+
+# Production server
+gunicorn==22.0.0
+eventlet==0.36.1
+
+# Slack (optional)
 slack-bolt==1.18.1
