@@ -160,6 +160,12 @@ async def run_browser_agent(
         )
         page = await browser.new_page(viewport={"width": 1280, "height": 900})
 
+        async def capture_step(desc: str, status: str):
+            shot = await page.screenshot(full_page=False)
+            fname = f"run_{run_id}_step_{step_num[0] + 1}.png"
+            (shots_dir / fname).write_bytes(shot)
+            save_step(desc, status, fname)
+
         # Auto-accept JS confirm/alert dialogs so form submissions aren't blocked
         page.on("dialog", lambda d: asyncio.ensure_future(d.accept()))
 
@@ -171,6 +177,7 @@ async def run_browser_agent(
         try:
             await page.goto(PANEL_URL, timeout=15_000, wait_until="domcontentloaded")
             await page.wait_for_timeout(400)
+            await capture_step("Panel loaded", "running")
         except Exception as e:
             raise RuntimeError(
                 f"Cannot reach panel at {PANEL_URL}. "
@@ -187,6 +194,7 @@ async def run_browser_agent(
                 raise RuntimeError(
                     "Panel login failed. Check PANEL_ADMIN_USER / PANEL_ADMIN_PASSWORD in .env"
                 )
+            await capture_step("Signed in to panel", "running")
 
         n_vision = sum(1 for s in plan if s.get("action") == "vision")
         n_direct = len(plan) - n_vision
@@ -209,49 +217,48 @@ async def run_browser_agent(
                 if act == "navigate":
                     url = plan_item.get("url", "/")
                     full_url = PANEL_URL + url if url.startswith("/") else url
-                    save_step(f"Navigate → {url}", "running")
                     try:
                         await page.goto(full_url, timeout=20_000, wait_until="domcontentloaded")
                         await page.wait_for_timeout(600)
+                        await capture_step(f"Navigate → {url}", "running")
                     except Exception as e:
-                        save_step(f"Navigate failed ({e})", "running")
+                        await capture_step(f"Navigate failed ({e})", "running")
 
                 elif act == "fill":
                     sel, val = plan_item["selector"], plan_item["value"]
-                    save_step(f"Fill [{sel}] ← '{val[:50]}'", "running")
                     try:
                         await page.fill(sel, val)
                         await page.wait_for_timeout(200)
+                        await capture_step(f"Fill [{sel}] ← '{val[:50]}'", "running")
                     except Exception as e:
-                        save_step(f"Fill failed ({e}) — falling back to vision", "running")
+                        await capture_step(f"Fill failed ({e}) — falling back to vision", "running")
                         plan_item = {"action": "vision", "instruction": f"Fill the field for '{val}' and continue the task"}
                         act = "vision"
 
                 elif act == "select":
                     sel, val = plan_item["selector"], plan_item["value"]
-                    save_step(f"Select '{val}' in [{sel}]", "running")
                     try:
                         await page.select_option(sel, value=val)
                         await page.wait_for_timeout(200)
+                        await capture_step(f"Select '{val}' in [{sel}]", "running")
                     except Exception as e:
-                        save_step(f"Select failed ({e}) — falling back to vision", "running")
+                        await capture_step(f"Select failed ({e}) — falling back to vision", "running")
                         plan_item = {"action": "vision", "instruction": f"Select '{val}' in the appropriate dropdown and continue the task"}
                         act = "vision"
 
                 elif act == "click":
                     sel = plan_item["selector"]
-                    save_step(f"Click [{sel}]", "running")
                     try:
                         await page.click(sel)
                         await page.wait_for_timeout(500)
+                        await capture_step(f"Click [{sel}]", "running")
                     except Exception as e:
-                        save_step(f"Click failed ({e}) — falling back to vision", "running")
+                        await capture_step(f"Click failed ({e}) — falling back to vision", "running")
                         plan_item = {"action": "vision", "instruction": "Click the submit/action button and continue the task"}
                         act = "vision"
 
                 elif act == "delete-user":
                     email = plan_item.get("email", "").strip().lower()
-                    save_step(f"Delete user {email}", "running")
                     try:
                         # Navigate to /users if not already there
                         if "/users" not in page.url:
@@ -279,9 +286,9 @@ async def run_browser_agent(
                         await page.wait_for_timeout(800)
                         if not deleted:
                             raise RuntimeError(f"User '{email}' not found in the table")
-                        save_step(f"User {email} deleted successfully", "running")
+                        await capture_step(f"User {email} deleted successfully", "running")
                     except Exception as e:
-                        save_step(f"Direct delete failed ({e}) — falling back to vision", "running")
+                        await capture_step(f"Direct delete failed ({e}) — falling back to vision", "running")
                         plan_item = {
                             "action": "vision",
                             "instruction": f"Find {email} in the All Users table and click the Delete button in their row. Confirm any dialog.",
