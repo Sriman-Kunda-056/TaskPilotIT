@@ -3,15 +3,13 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>{% block title %}IT Ops{% endblock %} · Decawork</title>
+  <title>{% block title %}IT Ops{% endblock %} · TaskPilot</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
 </head>
 <body>
 
-  <!-- Sidebar nav -->
   <aside class="sidebar">
     <div class="sidebar-logo">
       <span class="logo-icon">⬡</span>
@@ -33,24 +31,24 @@
       </a>
       <a href="/agent" class="nav-item {% if '/agent' in request.path %}active{% endif %}">
         <span class="nav-icon">◎</span><span>AI Agent</span>
-        <span class="nav-badge" id="agent-badge" style="display:none">●</span>
       </a>
     </nav>
-
-    <!-- Live event ticker at bottom of sidebar -->
-    <div class="sidebar-ticker">
-      <div class="ticker-label">LIVE EVENTS</div>
-      <div id="ticker-feed"></div>
-    </div>
   </aside>
 
-  <!-- Main content -->
   <div class="main-wrap">
     <header class="topbar">
       <div class="topbar-title">{% block page_title %}{% endblock %}</div>
       <div class="topbar-right">
-        <div class="ws-dot" id="ws-dot" title="WebSocket"></div>
         <span class="topbar-time" id="clock"></span>
+        <span style="font-family:var(--mono);font-size:.72rem;color:var(--text3);
+                     border-left:1px solid var(--border);padding-left:.75rem;margin-left:.25rem">
+          {{ session.get('admin_username','') }}
+        </span>
+        <a href="/logout"
+           style="font-size:.72rem;color:var(--text3);text-decoration:none;
+                  border:1px solid var(--border);border-radius:4px;
+                  padding:.2rem .55rem;margin-left:.4rem;font-family:var(--mono)"
+           title="Sign out">⎋ out</a>
       </div>
     </header>
 
@@ -60,47 +58,11 @@
   </div>
 
   <script>
-    // Clock
     const clockEl = document.getElementById('clock');
     function tick() {
       clockEl.textContent = new Date().toLocaleTimeString('en-US', {hour12:false});
     }
     tick(); setInterval(tick, 1000);
-
-    // WebSocket
-    const socket = io();
-    const dot = document.getElementById('ws-dot');
-    const ticker = document.getElementById('ticker-feed');
-    const badge = document.getElementById('agent-badge');
-
-    socket.on('connect', () => { dot.classList.add('connected'); });
-    socket.on('disconnect', () => { dot.classList.remove('connected'); });
-
-    socket.on('action_result', (d) => {
-      addTick(d.event, d.success);
-    });
-
-    socket.on('agent_status', (d) => {
-      if (d.status === 'running') {
-        badge.style.display = 'inline';
-        badge.classList.add('pulse');
-      } else {
-        badge.style.display = 'none';
-        badge.classList.remove('pulse');
-      }
-      addTick('agent:' + d.status, d.status !== 'error');
-    });
-
-    function addTick(label, ok) {
-      const el = document.createElement('div');
-      el.className = 'tick-item ' + (ok ? 'tick-ok' : 'tick-err');
-      el.textContent = label;
-      ticker.prepend(el);
-      while (ticker.children.length > 5) ticker.removeChild(ticker.lastChild);
-    }
-
-    // Page-level socket reference for child pages
-    window._socket = socket;
   </script>
   {% block scripts %}{% endblock %}
 </body>

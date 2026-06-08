@@ -7,6 +7,7 @@ Usage:
     python main.py --headless "create user Jane Doe jane@company.com"
 """
 import asyncio, sys, os
+from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -32,13 +33,15 @@ async def main():
     if args:
         task = " ".join(args)
     else:
-        print("\n" + "="*55 + "\n  Decawork IT Agent\n" + "="*55)
+        print("\n" + "="*55 + "\n  TaskPilot IT Agent\n" + "="*55)
         for i, t in enumerate(DEMOS, 1): print(f"  {i}. {t}")
         print("  0. Custom\n" + "="*55)
         c = input("Choose: ").strip()
         task = DEMOS[int(c)-1] if c.isdigit() and 1<=int(c)<=len(DEMOS) else input("Task: ").strip()
 
-    await run_task(task, headless=headless, run_id=0, sock=None)
+    db_path = str(Path(__file__).parent / "panel" / "admin.db")
+    shots   = str(Path(__file__).parent / "panel" / "static" / "screenshots")
+    await run_task(task, headless=headless, run_id=0, db_path=db_path, screenshots_dir=shots)
 
 if __name__ == "__main__":
     asyncio.run(main())

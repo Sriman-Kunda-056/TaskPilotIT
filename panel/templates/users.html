@@ -7,6 +7,51 @@
   <div><h1>User Management</h1><div class="sub">{{ users|length }} users in directory</div></div>
 </div>
 
+{% if banner %}
+<div class="banner banner-{{ banner.type }}" id="top-banner">
+  {{ banner.msg }}
+  <button onclick="document.getElementById('top-banner').remove()"
+          style="background:none;border:none;color:inherit;cursor:pointer;
+                 float:right;font-size:1rem;line-height:1">✕</button>
+</div>
+{% endif %}
+
+{% if pw_result %}
+<div class="pw-result-card" id="pw-result">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+    <span style="font-weight:600;color:var(--text1)">🔑 Password Reset</span>
+    <button onclick="document.getElementById('pw-result').remove()"
+            style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:1.1rem">✕</button>
+  </div>
+  <div style="display:grid;grid-template-columns:auto 1fr;gap:.3rem .75rem;font-size:.84rem;margin-bottom:.85rem">
+    <span style="color:var(--text3)">User</span>
+    <span style="color:var(--text1)">{{ pw_result.email }}</span>
+    <span style="color:var(--text3)">Type</span>
+    <span style="color:var(--cyan)">{{ 'Auto-generated' if pw_result.generated else 'Custom' }}</span>
+  </div>
+  <div style="font-size:.75rem;color:var(--text3);margin-bottom:.4rem">New Password</div>
+  <div style="display:flex;align-items:center;gap:.5rem">
+    <code id="pw-val" style="background:var(--bg);padding:.4rem .75rem;border-radius:6px;
+          font-size:1rem;color:#79c0ff;letter-spacing:.06em;flex:1">{{ pw_result.password }}</code>
+    <button id="copy-btn" onclick="copyPw()"
+            style="background:#21262d;border:1px solid var(--border);border-radius:6px;
+                   padding:.35rem .6rem;color:var(--text2);cursor:pointer;font-size:.85rem">📋</button>
+  </div>
+  <div style="color:#f0883e;font-size:.73rem;margin-top:.65rem">
+    ⚠ Share this securely — it won't be shown again once you leave this page.
+  </div>
+</div>
+<script>
+  function copyPw() {
+    navigator.clipboard.writeText(document.getElementById('pw-val').textContent).then(() => {
+      const b = document.getElementById('copy-btn');
+      b.textContent = '✅';
+      setTimeout(() => b.textContent = '📋', 2000);
+    });
+  }
+</script>
+{% endif %}
+
 <div class="two-col">
   <!-- Create User -->
   <div class="card">
@@ -30,8 +75,19 @@
               <option value="manager">Manager</option>
             </select>
           </div>
-          <div class="field" style="display:flex;align-items:flex-end">
-            <button type="submit" class="btn" name="submit-create-user" style="width:100%">+ Create</button>
+          <div class="field">
+            <label>Password</label>
+            <div style="display:flex;gap:.4rem">
+              <input type="password" name="password" id="create-pw"
+                     placeholder="Blank → changeme123" autocomplete="new-password" style="flex:1"/>
+              <button type="button" onclick="toggle('create-pw',this)"
+                      style="background:#21262d;border:1px solid var(--border);border-radius:6px;
+                             padding:0 .6rem;cursor:pointer;font-size:.9rem">👁</button>
+            </div>
+            <span style="font-size:.73rem;color:var(--text3)">Leave blank to default to <code>changeme123</code></span>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;grid-column:1/-1">
+            <button type="submit" class="btn" style="width:100%">+ Create User</button>
           </div>
         </div>
       </form>
@@ -53,19 +109,15 @@
               <label>New Password</label>
               <div style="display:flex;gap:.4rem">
                 <input type="password" name="new_password" id="reset-pw"
-                       placeholder="Blank = auto-generate"
-                       autocomplete="new-password" style="flex:1"/>
-                <button type="button" title="Toggle visibility"
-                        onclick="var f=document.getElementById('reset-pw');
-                                 f.type=f.type==='password'?'text':'password';
-                                 this.textContent=f.type==='password'?'👁':'🙈';"
-                        style="background:#21262d;border:1px solid #3b3b52;border-radius:6px;
+                       placeholder="Blank = auto-generate" autocomplete="new-password" style="flex:1"/>
+                <button type="button" onclick="toggle('reset-pw',this)"
+                        style="background:#21262d;border:1px solid var(--border);border-radius:6px;
                                padding:0 .6rem;cursor:pointer;font-size:.9rem">👁</button>
               </div>
-              <span style="font-size:.75rem;color:#8b949e">Leave blank to auto-generate a secure password</span>
+              <span style="font-size:.73rem;color:var(--text3)">Leave blank to auto-generate</span>
             </div>
             <div class="field" style="display:flex;align-items:flex-end;grid-column:1/-1">
-              <button type="submit" class="btn btn-warn" name="submit-reset-password" style="width:100%">Reset Password</button>
+              <button type="submit" class="btn btn-warn" style="width:100%">Reset Password</button>
             </div>
           </div>
         </form>
@@ -82,7 +134,7 @@
               <input type="email" name="email" placeholder="user@company.com" required/>
             </div>
             <div class="field" style="display:flex;align-items:flex-end">
-              <button type="submit" class="btn btn-ghost" name="submit-toggle-user">Toggle</button>
+              <button type="submit" class="btn btn-ghost">Toggle</button>
             </div>
           </div>
         </form>
@@ -92,12 +144,12 @@
 </div>
 
 <!-- Users table -->
-<div class="card">
+<div class="card" style="margin-top:1rem">
   <div class="card-head"><h2>All Users</h2></div>
   <div class="table-wrap">
     <table id="users-table">
       <thead>
-        <tr><th>Name</th><th>Email</th><th>Role</th><th>License</th><th>Status</th><th>Created</th></tr>
+        <tr><th>Name</th><th>Email</th><th>Role</th><th>License</th><th>Status</th><th>Created</th><th></th></tr>
       </thead>
       <tbody>
         {% for u in users %}
@@ -116,6 +168,17 @@
             </span>
           </td>
           <td class="cell-dim">{{ u.created_at[:10] }}</td>
+          <td>
+            <form action="/users/delete" method="POST"
+                  onsubmit="return confirm('Delete {{ u.name }} ({{ u.email }})?')">
+              <input type="hidden" name="email" value="{{ u.email }}"/>
+              <button type="submit"
+                      style="background:#21262d;border:1px solid #6e2c2c;border-radius:6px;
+                             color:#f85149;cursor:pointer;font-size:.8rem;padding:.2rem .55rem">
+                Delete
+              </button>
+            </form>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -123,68 +186,11 @@
   </div>
 </div>
 
-<!-- Reset Password Result Toast -->
-<div id="pw-toast" style="display:none;position:fixed;top:1.5rem;right:1.5rem;z-index:9999;
-     background:#1e1e2e;border:1px solid #3b3b52;border-radius:10px;padding:1.25rem 1.5rem;
-     min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.45)">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
-    <span style="font-weight:600;color:#c9d1d9">🔑 Password Reset</span>
-    <button onclick="document.getElementById('pw-toast').style.display='none'"
-            style="background:none;border:none;color:#888;cursor:pointer;font-size:1.1rem">✕</button>
-  </div>
-  <div style="color:#8b949e;font-size:.8rem;margin-bottom:.25rem">Email</div>
-  <div id="toast-email" style="color:#c9d1d9;font-size:.9rem;margin-bottom:.75rem"></div>
-  <div style="color:#8b949e;font-size:.8rem;margin-bottom:.25rem">
-    New Password <span id="toast-generated" style="color:#56d364;font-size:.75rem"></span>
-  </div>
-  <div style="display:flex;align-items:center;gap:.5rem">
-    <code id="toast-pw" style="background:#0d1117;padding:.35rem .7rem;border-radius:6px;
-          font-size:1rem;color:#79c0ff;letter-spacing:.05em;flex:1"></code>
-    <button onclick="copyPw(event)" title="Copy"
-            style="background:#21262d;border:1px solid #3b3b52;border-radius:6px;
-                   padding:.35rem .6rem;color:#c9d1d9;cursor:pointer;font-size:.85rem">📋</button>
-  </div>
-  <div style="color:#f0883e;font-size:.75rem;margin-top:.75rem">
-    ⚠ Share this securely — it won't be shown again.
-  </div>
-</div>
-
-<!-- Error Toast -->
-<div id="err-toast" style="display:none;position:fixed;top:1.5rem;right:1.5rem;z-index:9999;
-     background:#1e1e2e;border:1px solid #f85149;border-radius:10px;padding:1rem 1.5rem;
-     min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.45)">
-  <div style="display:flex;justify-content:space-between;align-items:center">
-    <span style="color:#f85149;font-weight:600">❌ <span id="err-msg"></span></span>
-    <button onclick="document.getElementById('err-toast').style.display='none'"
-            style="background:none;border:none;color:#888;cursor:pointer;margin-left:1rem">✕</button>
-  </div>
-</div>
-
 <script>
-  if (typeof io !== 'undefined') {
-    const socket = io();
-    socket.on('action_result', function(data) {
-      if (data.event === 'password_reset') {
-        if (data.success) {
-          document.getElementById('toast-email').textContent     = data.data.email;
-          document.getElementById('toast-pw').textContent        = data.data.new_password;
-          document.getElementById('toast-generated').textContent = data.data.generated ? '(auto-generated)' : '(custom)';
-          document.getElementById('pw-toast').style.display      = 'block';
-          setTimeout(() => document.getElementById('pw-toast').style.display = 'none', 30000);
-        } else {
-          document.getElementById('err-msg').textContent     = data.error || 'Reset failed';
-          document.getElementById('err-toast').style.display = 'block';
-          setTimeout(() => document.getElementById('err-toast').style.display = 'none', 5000);
-        }
-      }
-    });
-  }
-
-  function copyPw(e) {
-    navigator.clipboard.writeText(document.getElementById('toast-pw').textContent).then(() => {
-      e.target.textContent = '✅';
-      setTimeout(() => e.target.textContent = '📋', 2000);
-    });
+  function toggle(id, btn) {
+    var f = document.getElementById(id);
+    f.type = f.type === 'password' ? 'text' : 'password';
+    btn.textContent = f.type === 'password' ? '👁' : '🙈';
   }
 </script>
 {% endblock %}

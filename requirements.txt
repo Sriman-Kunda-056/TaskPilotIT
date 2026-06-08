@@ -11,7 +11,6 @@ playwright>=1.40.0
 # Pin to a known-good combo to avoid:
 # GenerativeServiceAsyncClient.generate_content() got an unexpected keyword argument 'max_retries'
 langchain-google-genai==2.0.11
-google-generativeai==0.8.5
 groq>=1.1.2,<2
 
 # Utilities

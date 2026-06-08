@@ -1,5 +1,4 @@
-# TaskpilotIT
-
+# Decawork IT Support Agent — v2
 
 AI-powered IT admin panel where an agent navigates a real browser using screenshots,
 streams every step live to a mission-control UI, and confirms actions via WebSocket.
