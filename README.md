@@ -9,7 +9,7 @@ streams every step live to a mission-control UI, and confirms actions via WebSoc
 ![LLM providers](https://img.shields.io/badge/LLM_providers-2-2ea44f)
 ![Tests](https://img.shields.io/badge/automated_tests-0-f59e0b)
 
-## Project snapshot
+## Evidence at a glance
 
 | Verified or documented capability | Count |
 | --- | ---: |
@@ -19,7 +19,7 @@ streams every step live to a mission-control UI, and confirms actions via WebSoc
 | Configured LLM providers | **2** |
 | Tracked browser-run screenshots | **14** |
 
-## Workflow preview
+## Preview
 
 ```mermaid
 flowchart LR
@@ -37,33 +37,22 @@ flowchart LR
 > recovery procedures have been reviewed. Existing run screenshots are not
 > embedded here because they have not been cleared for identifiable data.
 
-## Detailed architecture
+## Architecture
 
-```
-Natural language request (UI or Slack)
-             │
-             ▼
-    [Task Planner]  ← Groq / Llama-3.3-70b  (free)
-    NL → numbered browser navigation steps
-             │
-             ▼
-    [Browser Agent] ← Browser Use + Gemini 2.0 Flash  (free, has vision)
-    Opens real Chromium, navigates by sight — no DOM shortcuts
-             │
-       Every step:
-         ├── Screenshot → base64 → WebSocket → /agent page (live view)
-         ├── Step description → WebSocket → chat feed
-         └── Form submit → panel action → WebSocket event → confirmed
-             │
-             ▼
-    [Flask Admin Panel] ← SQLite + Flask-SocketIO
-    Renders navigable UI  +  emits structured events
-             │
-             ▼
-    [Logs DB]  — every panel action + agent step persisted, viewable at /logs
+```mermaid
+flowchart TD
+    U["Natural-language request<br/>agent page or Slack"] --> P["Planner<br/>numbered browser steps"]
+    P --> B["Screenshot-driven browser agent<br/>Chromium + vision provider"]
+    B --> PANEL["Flask admin panel<br/>users, licenses, and logs"]
+    PANEL --> EVENT["Flask-SocketIO<br/>structured confirmation"]
+    EVENT --> B
+    B --> STREAM["WebSocket stream<br/>screenshots + step descriptions"]
+    STREAM --> UI["Mission-control agent page"]
+    B --> DB[("SQLite audit trail")]
+    PANEL --> DB
 ```
 
-## Pages
+## What it does
 
 | Route | What it does |
 |-------|-------------|
@@ -75,7 +64,7 @@ Natural language request (UI or Slack)
 
 ---
 
-## Quick Start
+## Quick start
 
 ### 1. Install
 
@@ -178,3 +167,55 @@ docker compose --profile slack up  # panel + slack bot
 **Live streaming** — every Chromium screenshot during the agent run is base64-encoded and broadcast over WebSocket to the `/agent` page in real time. You watch it happen.
 
 **Full audit trail** — every panel action and every agent step is logged to SQLite and visible at `/logs`, filterable by source, with a live-updating stream at the bottom.
+
+## Tests and validation
+
+No automated test suite is tracked. Use only synthetic demo users and verify:
+
+1. Each of the five panel routes loads.
+2. A demo workflow streams steps and screenshots to `/agent`.
+3. A mutating action emits a WebSocket confirmation.
+4. The same action appears in the SQLite audit log.
+5. Failed or interrupted browser runs do not leave an unreviewed admin change.
+
+## Repository layout
+
+```text
+TaskPilotIT/
+|-- agent/                # Planner and screenshot-driven browser logic
+|-- panel/                # Flask admin panel, templates, and static assets
+|-- main.py               # CLI agent entry point
+|-- slack_bot.py          # Optional Slack Socket Mode integration
+|-- docker-compose.yml    # Panel, agent, and Slack profiles
+|-- env.example           # Secret-name template only
+`-- requirements.txt
+```
+
+## Limitations
+
+- The demo panel lacks the authentication, authorization, CSRF, and recovery
+  controls required for a real IT administration system.
+- Browser vision is probabilistic and can click the wrong control or act on stale
+  screenshots.
+- Password, identity, and license mutations require human confirmation and a
+  tested rollback procedure.
+- Existing screenshots were not approved for public embedding because they may
+  contain identifiable data.
+- Provider availability, pricing, quotas, and model behavior can change.
+
+## Numbered commit history
+
+1. `Initial` - import the browser-agent IT support demo.
+2. `01` - clarify workflows, live confirmation, privacy, and safety boundaries.
+3. `02` - standardize the evidence-first GitHub README format.
+
+## Suggested GitHub topics
+
+`it-automation` `browser-agent` `playwright` `flask` `flask-socketio`
+`websockets` `gemini` `groq` `slack-bot` `sqlite`
+
+## License and attribution
+
+No repository-wide license file is included. Browser Use, Playwright, Flask,
+Slack, Gemini, Groq, and other dependencies remain subject to their respective
+licenses and service terms.
