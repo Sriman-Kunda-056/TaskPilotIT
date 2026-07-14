@@ -1,11 +1,43 @@
-# Decawork IT Support Agent — v2
+# TaskPilotIT — Screenshot-Driven IT Support Agent
 
 AI-powered IT admin panel where an agent navigates a real browser using screenshots,
 streams every step live to a mission-control UI, and confirms actions via WebSocket.
 
----
+![Admin routes](https://img.shields.io/badge/admin_routes-5-2563eb)
+![Demo workflows](https://img.shields.io/badge/demo_workflows-5-7c3aed)
+![Launch modes](https://img.shields.io/badge/launch_modes-3-0ea5e9)
+![LLM providers](https://img.shields.io/badge/LLM_providers-2-2ea44f)
+![Tests](https://img.shields.io/badge/automated_tests-0-f59e0b)
 
-## Architecture
+## Project snapshot
+
+| Verified or documented capability | Count |
+| --- | ---: |
+| Flask admin routes | **5** |
+| Included demonstration workflows | **5** |
+| Launch modes: panel, CLI agent, Slack | **3** |
+| Configured LLM providers | **2** |
+| Tracked browser-run screenshots | **14** |
+
+## Workflow preview
+
+```mermaid
+flowchart LR
+    U["Natural-language request<br/>panel or Slack"] --> P["Task planner"]
+    P --> B["Screenshot-driven<br/>browser agent"]
+    B --> A["Flask admin panel"]
+    A --> E["WebSocket confirmation"]
+    E --> B
+    B --> L[("SQLite audit log")]
+    B --> V["Live mission-control view"]
+```
+
+> **Safety:** agent runs mutate user, password, and license state. Use only the
+> included demo panel until authentication, authorization, CSRF protection, and
+> recovery procedures have been reviewed. Existing run screenshots are not
+> embedded here because they have not been cleared for identifiable data.
+
+## Detailed architecture
 
 ```
 Natural language request (UI or Slack)
@@ -48,18 +80,24 @@ Natural language request (UI or Slack)
 ### 1. Install
 
 ```bash
-git clone <repo> && cd decawork-agent
-python -m venv venv && source venv/bin/activate
+git clone https://github.com/Sriman-Kunda-056/TaskPilotIT.git
+cd TaskPilotIT
+python -m venv .venv
+# Linux/macOS: source .venv/bin/activate
+# Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 playwright install chromium
 ```
 
-### 2. Free API keys (no credit card)
+### 2. Provider API keys
 
-| Key | Where | Limit |
-|-----|-------|-------|
-| `GEMINI_API_KEY` | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) | 1500 req/day |
-| `GROQ_API_KEY` | [console.groq.com/keys](https://console.groq.com/keys) | Generous free tier |
+| Key | Provider |
+|-----|----------|
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| `GROQ_API_KEY` | [Groq Console](https://console.groq.com/keys) |
+
+Provider pricing, quotas, and model availability change over time; verify the
+current terms before running the agent.
 
 ```bash
 cp env.example .env
